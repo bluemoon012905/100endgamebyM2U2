@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>100 Endgame SGF Reader</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="layout">
+    <section class="board-panel">
+      <div class="toolbar">
+        <label for="sgfSelect">Problem</label>
+        <select id="sgfSelect" aria-label="Choose SGF file"></select>
+        <button id="reloadBtn" type="button">Reload</button>
+      </div>
+      <canvas id="board" width="540" height="540" aria-label="Go board"></canvas>
+      <div class="nav-row">
+        <button id="firstBtn" type="button">|&lt;</button>
+        <button id="prevBtn" type="button">&lt;</button>
+        <button id="nextBtn" type="button">&gt;</button>
+        <button id="lastBtn" type="button">&gt;|</button>
+      </div>
+      <div class="hint">Click a board point to follow that move when a branch exists.</div>
+    </section>
+
+    <aside class="info-panel">
+      <h1>100 Endgame SGF Reader</h1>
+      <div id="status" class="status"></div>
+      <div class="captures" id="captures"></div>
+      <div>
+        <h2>Variations</h2>
+        <div id="variations" class="variations"></div>
+      </div>
+      <div>
+        <h2>Notes</h2>
+        <pre id="notes" class="notes"></pre>
+      </div>
+      <div class="controls-note">
+        Keyboard: Left/Right (prev/next), Home/End (start/end)
+      </div>
+    </aside>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

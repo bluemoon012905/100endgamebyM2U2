@@ -1,0 +1,155 @@
+:root {
+  --bg: #f7f0e2;
+  --panel: #fff8ec;
+  --line: #d8c7a5;
+  --ink: #1d1a16;
+  --board: #d9a75d;
+  --board-dark: #bb8a44;
+  --accent: #245b43;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 20% 10%, #fff7ea 0, transparent 40%),
+    radial-gradient(circle at 90% 90%, #edd2a8 0, transparent 35%),
+    var(--bg);
+}
+
+.layout {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(320px, 620px) minmax(260px, 1fr);
+}
+
+.board-panel,
+.info-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 6px 20px rgba(64, 34, 2, 0.08);
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.toolbar select,
+.toolbar button,
+.nav-row button {
+  border-radius: 8px;
+  border: 1px solid #a79370;
+  background: #fffef9;
+  color: var(--ink);
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.toolbar button,
+.nav-row button,
+.variation-btn {
+  cursor: pointer;
+}
+
+.toolbar button:hover,
+.nav-row button:hover,
+.variation-btn:hover {
+  background: #f2ebdd;
+}
+
+#board {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid var(--board-dark);
+  background: var(--board);
+  display: block;
+}
+
+.nav-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.nav-row button {
+  flex: 1;
+  font-weight: 700;
+}
+
+.hint {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #4b443c;
+}
+
+.info-panel h1 {
+  margin: 0 0 10px;
+  font-size: 1.2rem;
+}
+
+.info-panel h2 {
+  margin: 14px 0 8px;
+  font-size: 1rem;
+}
+
+.status,
+.captures,
+.controls-note {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.variations {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.variation-btn {
+  border: 1px solid #947954;
+  background: #fffaf0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.variation-btn.active {
+  background: var(--accent);
+  color: #f2fff9;
+  border-color: #143829;
+}
+
+.notes {
+  margin: 0;
+  white-space: pre-wrap;
+  min-height: 140px;
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid #dfcfb1;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fffdf7;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
