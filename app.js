@@ -1,34 +1,71 @@
 const SGF_DIR = "9x9 Endgame Book 1";
 
+const MODES = {
+  EXPLORATION: "exploration",
+  RESPONSIVE: "responsive",
+  ANSWER_KEY: "answer-key",
+};
+
+const MODE_LABELS = {
+  [MODES.EXPLORATION]: "Exploration Mode",
+  [MODES.RESPONSIVE]: "Responsive Puzzle",
+  [MODES.ANSWER_KEY]: "Answer Key Puzzle",
+};
+
+const startScreenEl = document.getElementById("startScreen");
+const viewerEl = document.getElementById("viewer");
+const startSgfSelect = document.getElementById("startSgfSelect");
+const modeButtons = Array.from(document.querySelectorAll(".mode-btn"));
+
 const boardCanvas = document.getElementById("board");
 const ctx = boardCanvas.getContext("2d");
 const sgfSelect = document.getElementById("sgfSelect");
 const reloadBtn = document.getElementById("reloadBtn");
+const changeModeBtn = document.getElementById("changeModeBtn");
+const modePill = document.getElementById("modePill");
 const firstBtn = document.getElementById("firstBtn");
 const prevBtn = document.getElementById("prevBtn");
 const nextBtn = document.getElementById("nextBtn");
 const lastBtn = document.getElementById("lastBtn");
+const navRow = document.getElementById("navRow");
+const puzzleActions = document.getElementById("puzzleActions");
+const puzzleResetBtn = document.getElementById("puzzleResetBtn");
+const puzzleSubmitBtn = document.getElementById("puzzleSubmitBtn");
+const hintTextEl = document.getElementById("hintText");
+const feedbackOverlayEl = document.getElementById("feedbackOverlay");
 const statusEl = document.getElementById("status");
 const capturesEl = document.getElementById("captures");
 const notesEl = document.getElementById("notes");
+const variationBlockEl = document.getElementById("variationBlock");
 const variationsEl = document.getElementById("variations");
 
 const state = {
+  mode: null,
   root: null,
   virtualRoot: null,
   currentNode: null,
   selectedChildByNodeId: new Map(),
   nextNodeId: 1,
   boardSize: 9,
+  puzzle: {
+    answerPath: [],
+    answerIndex: 0,
+    playerColor: "B",
+    answerMoves: [],
+    answerComment: "",
+    baseBoardState: null,
+    userMoves: [],
+  },
 };
 
-function initSelector() {
+function initSelector(selectEl) {
+  selectEl.innerHTML = "";
   for (let i = 1; i <= 100; i += 1) {
     const id = String(i).padStart(3, "0");
     const option = document.createElement("option");
     option.value = `${SGF_DIR}/${id}.sgf`;
     option.textContent = `${id}.sgf`;
-    sgfSelect.appendChild(option);
+    selectEl.appendChild(option);
   }
 }
 
@@ -42,6 +79,10 @@ function coordToPoint(coord) {
     return null;
   }
   return { x, y };
+}
+
+function pointToCoord(point) {
+  return String.fromCharCode(97 + point.x) + String.fromCharCode(97 + point.y);
 }
 
 function parseSgf(text) {
@@ -189,6 +230,10 @@ function newBoard(size) {
   return Array.from({ length: size }, () => Array(size).fill(null));
 }
 
+function cloneBoard(board) {
+  return board.map((row) => row.slice());
+}
+
 function pointKey(p) {
   return `${p.x},${p.y}`;
 }
@@ -285,6 +330,44 @@ function getPathTo(node) {
   return path;
 }
 
+function parseLabels(node) {
+  const labels = [];
+  for (const raw of node.props.LB || []) {
+    const [coord, text] = raw.split(":");
+    const p = coordToPoint(coord);
+    if (p && text) {
+      labels.push({ ...p, text });
+    }
+  }
+  return labels;
+}
+
+function parseMarks(node) {
+  const marks = [];
+  const markProps = ["MA", "TR", "SQ", "CR"];
+  for (const type of markProps) {
+    for (const coord of node.props[type] || []) {
+      const p = coordToPoint(coord);
+      if (p) {
+        marks.push({ ...p, type });
+      }
+    }
+  }
+  return marks;
+}
+
+function getNodeMove(node) {
+  if (node.props.B && node.props.B.length) {
+    const point = coordToPoint(node.props.B[0]);
+    return { color: "B", point, coord: node.props.B[0] || "" };
+  }
+  if (node.props.W && node.props.W.length) {
+    const point = coordToPoint(node.props.W[0]);
+    return { color: "W", point, coord: node.props.W[0] || "" };
+  }
+  return null;
+}
+
 function boardStateForNode(node) {
   const path = getPathTo(node);
   let size = state.boardSize;
@@ -323,52 +406,23 @@ function boardStateForNode(node) {
       }
     }
 
-    if (n.props.B && n.props.B.length) {
+    const move = getNodeMove(n);
+    if (move) {
       moveNumber += 1;
-      const point = coordToPoint(n.props.B[0]);
-      applyMove(board, "B", point, captures);
-      lastMove = point;
-    }
-    if (n.props.W && n.props.W.length) {
-      moveNumber += 1;
-      const point = coordToPoint(n.props.W[0]);
-      applyMove(board, "W", point, captures);
-      lastMove = point;
+      applyMove(board, move.color, move.point, captures);
+      lastMove = move.point;
     }
   }
 
-  return { board, captures, moveNumber, lastMove, size };
-}
-
-function currentComment() {
-  const comments = state.currentNode?.props?.C || [];
-  return comments.join("\n").trim();
-}
-
-function parseLabels(node) {
-  const labels = [];
-  for (const raw of node.props.LB || []) {
-    const [coord, text] = raw.split(":");
-    const p = coordToPoint(coord);
-    if (p && text) {
-      labels.push({ ...p, text });
-    }
-  }
-  return labels;
-}
-
-function parseMarks(node) {
-  const marks = [];
-  const markProps = ["MA", "TR", "SQ", "CR"];
-  for (const type of markProps) {
-    for (const coord of node.props[type] || []) {
-      const p = coordToPoint(coord);
-      if (p) {
-        marks.push({ ...p, type });
-      }
-    }
-  }
-  return marks;
+  return {
+    board,
+    captures,
+    moveNumber,
+    lastMove,
+    size,
+    labels: parseLabels(node),
+    marks: parseMarks(node),
+  };
 }
 
 function drawBoard(stateForNode) {
@@ -461,11 +515,10 @@ function drawBoard(stateForNode) {
     ctx.stroke();
   }
 
-  const labels = parseLabels(state.currentNode);
   ctx.font = `${Math.max(11, Math.round(cell * 0.34))}px sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  for (const l of labels) {
+  for (const l of stateForNode.labels || []) {
     if (l.x >= size || l.y >= size) continue;
     const cx = pad + l.x * cell;
     const cy = pad + l.y * cell;
@@ -474,8 +527,7 @@ function drawBoard(stateForNode) {
     ctx.fillText(l.text, cx, cy);
   }
 
-  const marks = parseMarks(state.currentNode);
-  for (const m of marks) {
+  for (const m of stateForNode.marks || []) {
     if (m.x >= size || m.y >= size) continue;
     const cx = pad + m.x * cell;
     const cy = pad + m.y * cell;
@@ -548,7 +600,12 @@ function renderVariations() {
   });
 }
 
-function renderStatus(boardState) {
+function commentForNode(node) {
+  const comments = node?.props?.C || [];
+  return comments.join("\n").trim();
+}
+
+function renderStatusNode(boardState) {
   const hasMove = state.currentNode.props.B || state.currentNode.props.W;
   const moveColor = state.currentNode.props.B ? "Black" : state.currentNode.props.W ? "White" : null;
   const moveCoord = state.currentNode.props.B?.[0] || state.currentNode.props.W?.[0] || "";
@@ -556,19 +613,177 @@ function renderStatus(boardState) {
   const prefix = hasMove ? `${moveColor} played ${moveCoord || "pass"}` : "Setup / root node";
   statusEl.textContent = `${prefix} | Move ${boardState.moveNumber} | Board ${boardState.size}x${boardState.size}`;
   capturesEl.textContent = `Captures -> Black: ${boardState.captures.B} | White: ${boardState.captures.W}`;
+}
 
-  const note = currentComment();
-  notesEl.textContent = note || "(No note on this node)";
+function renderExploration() {
+  const bState = boardStateForNode(state.currentNode);
+  drawBoard(bState);
+  renderStatusNode(bState);
+  renderVariations();
+  notesEl.textContent = commentForNode(state.currentNode) || "(No note on this node)";
+}
+
+function buildMainlinePath(startNode) {
+  const out = [];
+  let cursor = startNode;
+  while (cursor) {
+    out.push(cursor);
+    if (!cursor.children.length) {
+      break;
+    }
+    cursor = cursor.children[0];
+  }
+  return out;
+}
+
+function extractAnswerMoves(path) {
+  const out = [];
+  for (let i = 1; i < path.length; i += 1) {
+    const move = getNodeMove(path[i]);
+    if (move && move.point) {
+      out.push({
+        color: move.color,
+        point: move.point,
+        coord: move.coord,
+      });
+    }
+  }
+  return out;
+}
+
+function findAnswerComment(path) {
+  for (let i = path.length - 1; i >= 0; i -= 1) {
+    const c = commentForNode(path[i]);
+    if (c) {
+      return c;
+    }
+  }
+  return "(No answer comment in this SGF)";
+}
+
+function showFeedback(message, isWrong = false) {
+  feedbackOverlayEl.textContent = isWrong ? `✗ ${message}` : message;
+  feedbackOverlayEl.classList.remove("hidden");
+  setTimeout(() => {
+    feedbackOverlayEl.classList.add("hidden");
+  }, 1200);
+}
+
+function setupResponsivePuzzle() {
+  const path = buildMainlinePath(state.root);
+  state.puzzle.answerPath = path;
+  state.puzzle.answerIndex = 0;
+
+  const firstMove = extractAnswerMoves(path)[0];
+  state.puzzle.playerColor = firstMove ? firstMove.color : "B";
+  state.currentNode = path[0];
+
+  advanceResponsiveToPlayerTurn();
+  renderResponsivePuzzle();
+}
+
+function advanceResponsiveToPlayerTurn() {
+  const path = state.puzzle.answerPath;
+  while (state.puzzle.answerIndex < path.length - 1) {
+    const next = path[state.puzzle.answerIndex + 1];
+    const move = getNodeMove(next);
+
+    if (!move || !move.point) {
+      state.puzzle.answerIndex += 1;
+      continue;
+    }
+
+    if (move.color !== state.puzzle.playerColor) {
+      state.puzzle.answerIndex += 1;
+      continue;
+    }
+
+    break;
+  }
+
+  state.currentNode = path[state.puzzle.answerIndex] || path[path.length - 1];
+}
+
+function renderResponsivePuzzle() {
+  const bState = boardStateForNode(state.currentNode);
+  drawBoard(bState);
+  renderStatusNode(bState);
+
+  const next = state.puzzle.answerPath[state.puzzle.answerIndex + 1];
+  const done = !next;
+  if (done) {
+    statusEl.textContent = `Solved | Move ${bState.moveNumber} | Board ${bState.size}x${bState.size}`;
+    notesEl.textContent = state.puzzle.answerComment;
+    hintTextEl.textContent = "Solved. Load another problem or change mode.";
+  } else {
+    notesEl.textContent = "Find the correct move continuation.";
+    hintTextEl.textContent = `Play as ${state.puzzle.playerColor === "B" ? "Black" : "White"}. Wrong move shows immediately.`;
+  }
+}
+
+function setupAnswerKeyPuzzle() {
+  const path = buildMainlinePath(state.root);
+  state.puzzle.answerPath = path;
+  state.puzzle.answerMoves = extractAnswerMoves(path);
+  state.puzzle.answerComment = findAnswerComment(path);
+  state.puzzle.userMoves = [];
+  state.currentNode = state.root;
+
+  const baseState = boardStateForNode(state.root);
+  state.puzzle.baseBoardState = {
+    board: cloneBoard(baseState.board),
+    captures: { ...baseState.captures },
+    size: baseState.size,
+    moveNumber: baseState.moveNumber,
+    lastMove: baseState.lastMove,
+  };
+
+  renderAnswerKeyPuzzle();
+}
+
+function rebuildAnswerAttemptBoard() {
+  const base = state.puzzle.baseBoardState;
+  const board = cloneBoard(base.board);
+  const captures = { ...base.captures };
+  let lastMove = base.lastMove;
+
+  for (const move of state.puzzle.userMoves) {
+    applyMove(board, move.color, move.point, captures);
+    lastMove = move.point;
+  }
+
+  return {
+    board,
+    captures,
+    size: base.size,
+    moveNumber: base.moveNumber + state.puzzle.userMoves.length,
+    lastMove,
+    labels: [],
+    marks: [],
+  };
+}
+
+function renderAnswerKeyPuzzle() {
+  const bState = rebuildAnswerAttemptBoard();
+  drawBoard(bState);
+  capturesEl.textContent = `Captures -> Black: ${bState.captures.B} | White: ${bState.captures.W}`;
+  statusEl.textContent = `Your line length: ${state.puzzle.userMoves.length} / ${state.puzzle.answerMoves.length}`;
+  notesEl.textContent = "Play both sides, then press Submit to compare with the answer line.";
+  hintTextEl.textContent = "Alternate moves by clicking intersections. Submit checks exact move order.";
 }
 
 function render() {
   if (!state.currentNode) {
     return;
   }
-  const bState = boardStateForNode(state.currentNode);
-  drawBoard(bState);
-  renderStatus(bState);
-  renderVariations();
+
+  if (state.mode === MODES.EXPLORATION) {
+    renderExploration();
+  } else if (state.mode === MODES.RESPONSIVE) {
+    renderResponsivePuzzle();
+  } else if (state.mode === MODES.ANSWER_KEY) {
+    renderAnswerKeyPuzzle();
+  }
 }
 
 function canGoNext() {
@@ -627,6 +842,104 @@ function goToChildByMove(point) {
   }
 }
 
+function applyResponsiveClick(point) {
+  const path = state.puzzle.answerPath;
+  const next = path[state.puzzle.answerIndex + 1];
+  if (!next) {
+    return;
+  }
+
+  const move = getNodeMove(next);
+  if (!move || !move.point || move.color !== state.puzzle.playerColor) {
+    return;
+  }
+
+  if (move.point.x !== point.x || move.point.y !== point.y) {
+    showFeedback("Wrong!", true);
+    return;
+  }
+
+  state.puzzle.answerIndex += 1;
+  advanceResponsiveToPlayerTurn();
+
+  if (state.puzzle.answerIndex >= path.length - 1) {
+    showFeedback("Correct line", false);
+  }
+
+  render();
+}
+
+function answerKeyNextColor() {
+  const firstAnswerMove = state.puzzle.answerMoves[0];
+  const startColor = firstAnswerMove ? firstAnswerMove.color : "B";
+  if (!state.puzzle.userMoves.length) {
+    return startColor;
+  }
+  return state.puzzle.userMoves[state.puzzle.userMoves.length - 1].color === "B" ? "W" : "B";
+}
+
+function applyAnswerKeyClick(point) {
+  const boardState = rebuildAnswerAttemptBoard();
+  if (boardState.board[point.y][point.x] !== null) {
+    return;
+  }
+
+  const color = answerKeyNextColor();
+  state.puzzle.userMoves.push({
+    color,
+    point,
+    coord: pointToCoord(point),
+  });
+  render();
+}
+
+function submitAnswerKey() {
+  const expected = state.puzzle.answerMoves;
+  const actual = state.puzzle.userMoves;
+
+  const sameLength = expected.length === actual.length;
+  let match = sameLength;
+  if (sameLength) {
+    for (let i = 0; i < expected.length; i += 1) {
+      const e = expected[i];
+      const a = actual[i];
+      if (!a || e.color !== a.color || e.point.x !== a.point.x || e.point.y !== a.point.y) {
+        match = false;
+        break;
+      }
+    }
+  }
+
+  if (!match) {
+    showFeedback("Wrong!", true);
+    notesEl.textContent = "Line does not match the answer key. Reset and try again.";
+    return;
+  }
+
+  showFeedback("Correct", false);
+  notesEl.textContent = state.puzzle.answerComment;
+}
+
+function resetAnswerKeyAttempt() {
+  state.puzzle.userMoves = [];
+  render();
+}
+
+function applyModeUi() {
+  modePill.textContent = MODE_LABELS[state.mode] || "Mode";
+
+  const isExploration = state.mode === MODES.EXPLORATION;
+  const isAnswerKey = state.mode === MODES.ANSWER_KEY;
+
+  navRow.classList.toggle("hidden", !isExploration);
+  variationBlockEl.classList.toggle("hidden", !isExploration);
+  puzzleActions.classList.toggle("hidden", !isAnswerKey);
+
+  if (isExploration) {
+    hintTextEl.textContent = "Click a board point to follow that move when a branch exists.";
+  }
+}
+
 async function loadSgf(path) {
   const res = await fetch(encodeURI(path));
   if (!res.ok) {
@@ -636,6 +949,8 @@ async function loadSgf(path) {
 
   state.nextNodeId = 1;
   state.selectedChildByNodeId.clear();
+  state.puzzle.userMoves = [];
+
   const gameTree = parseSgf(text);
   state.virtualRoot = buildNodeTree(gameTree);
 
@@ -645,17 +960,61 @@ async function loadSgf(path) {
 
   state.root = state.virtualRoot.children[0];
   state.currentNode = state.root;
-  render();
+
+  const pathNodes = buildMainlinePath(state.root);
+  state.puzzle.answerComment = findAnswerComment(pathNodes);
+
+  if (state.mode === MODES.RESPONSIVE) {
+    setupResponsivePuzzle();
+  } else if (state.mode === MODES.ANSWER_KEY) {
+    setupAnswerKeyPuzzle();
+  } else {
+    render();
+  }
+}
+
+function startMode(mode) {
+  state.mode = mode;
+  sgfSelect.value = startSgfSelect.value;
+
+  startScreenEl.classList.add("hidden");
+  viewerEl.classList.remove("hidden");
+  applyModeUi();
+
+  loadSgf(sgfSelect.value).catch((err) => {
+    statusEl.textContent = err.message;
+  });
+}
+
+function backToStart() {
+  viewerEl.classList.add("hidden");
+  startScreenEl.classList.remove("hidden");
+  feedbackOverlayEl.classList.add("hidden");
+  state.mode = null;
 }
 
 function wireEvents() {
+  startSgfSelect.addEventListener("change", () => {
+    sgfSelect.value = startSgfSelect.value;
+  });
+
+  modeButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const mode = btn.dataset.mode;
+      startMode(mode);
+    });
+  });
+
   reloadBtn.addEventListener("click", () => {
     loadSgf(sgfSelect.value).catch((err) => {
       statusEl.textContent = err.message;
     });
   });
 
+  changeModeBtn.addEventListener("click", backToStart);
+
   sgfSelect.addEventListener("change", () => {
+    startSgfSelect.value = sgfSelect.value;
     loadSgf(sgfSelect.value).catch((err) => {
       statusEl.textContent = err.message;
     });
@@ -666,7 +1025,14 @@ function wireEvents() {
   nextBtn.addEventListener("click", goNext);
   lastBtn.addEventListener("click", goLast);
 
+  puzzleSubmitBtn.addEventListener("click", submitAnswerKey);
+  puzzleResetBtn.addEventListener("click", resetAnswerKeyAttempt);
+
   window.addEventListener("keydown", (e) => {
+    if (state.mode !== MODES.EXPLORATION) {
+      return;
+    }
+
     if (e.key === "ArrowLeft") {
       e.preventDefault();
       goPrev();
@@ -683,7 +1049,7 @@ function wireEvents() {
   });
 
   boardCanvas.addEventListener("click", (e) => {
-    if (!boardCanvas._renderMeta) {
+    if (!boardCanvas._renderMeta || !state.mode) {
       return;
     }
     const rect = boardCanvas.getBoundingClientRect();
@@ -698,12 +1064,20 @@ function wireEvents() {
       return;
     }
 
-    goToChildByMove({ x: gx, y: gy });
+    const point = { x: gx, y: gy };
+
+    if (state.mode === MODES.EXPLORATION) {
+      goToChildByMove(point);
+    } else if (state.mode === MODES.RESPONSIVE) {
+      applyResponsiveClick(point);
+    } else if (state.mode === MODES.ANSWER_KEY) {
+      applyAnswerKeyClick(point);
+    }
   });
 }
 
-initSelector();
+initSelector(startSgfSelect);
+initSelector(sgfSelect);
+startSgfSelect.value = `${SGF_DIR}/001.sgf`;
+sgfSelect.value = startSgfSelect.value;
 wireEvents();
-loadSgf(`${SGF_DIR}/001.sgf`).catch((err) => {
-  statusEl.textContent = err.message;
-});

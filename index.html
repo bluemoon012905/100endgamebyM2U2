@@ -7,28 +7,60 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main class="layout">
+  <section id="startScreen" class="start-screen">
+    <div class="start-card">
+      <h1>100 Endgame SGF Reader</h1>
+      <p class="start-subtitle">Choose a mode and problem to begin.</p>
+      <div class="start-row">
+        <label for="startSgfSelect">Problem</label>
+        <select id="startSgfSelect" aria-label="Choose SGF file"></select>
+      </div>
+      <div class="mode-grid">
+        <button type="button" class="mode-btn" data-mode="exploration">
+          <span class="mode-title">Exploration Mode</span>
+          <span class="mode-copy">Browse lines, branches, and notes.</span>
+        </button>
+        <button type="button" class="mode-btn" data-mode="responsive">
+          <span class="mode-title">Responsive Puzzle</span>
+          <span class="mode-copy">Play one side only and get instant feedback.</span>
+        </button>
+        <button type="button" class="mode-btn" data-mode="answer-key">
+          <span class="mode-title">Answer Key Puzzle</span>
+          <span class="mode-copy">Play both sides and submit to check the line.</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <main id="viewer" class="layout hidden">
     <section class="board-panel">
       <div class="toolbar">
+        <span id="modePill" class="mode-pill">Mode</span>
         <label for="sgfSelect">Problem</label>
         <select id="sgfSelect" aria-label="Choose SGF file"></select>
         <button id="reloadBtn" type="button">Reload</button>
+        <button id="changeModeBtn" type="button">Change Mode</button>
       </div>
       <canvas id="board" width="540" height="540" aria-label="Go board"></canvas>
-      <div class="nav-row">
+      <div id="navRow" class="nav-row">
         <button id="firstBtn" type="button">|&lt;</button>
         <button id="prevBtn" type="button">&lt;</button>
         <button id="nextBtn" type="button">&gt;</button>
         <button id="lastBtn" type="button">&gt;|</button>
       </div>
-      <div class="hint">Click a board point to follow that move when a branch exists.</div>
+      <div id="puzzleActions" class="puzzle-actions hidden">
+        <button id="puzzleResetBtn" type="button">Reset Attempt</button>
+        <button id="puzzleSubmitBtn" type="button">Submit</button>
+      </div>
+      <div id="hintText" class="hint">Click a board point to follow that move when a branch exists.</div>
+      <div id="feedbackOverlay" class="feedback-overlay hidden" aria-live="assertive"></div>
     </section>
 
     <aside class="info-panel">
       <h1>100 Endgame SGF Reader</h1>
       <div id="status" class="status"></div>
       <div class="captures" id="captures"></div>
-      <div>
+      <div id="variationBlock">
         <h2>Variations</h2>
         <div id="variations" class="variations"></div>
       </div>
