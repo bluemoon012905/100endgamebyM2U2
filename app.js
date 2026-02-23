@@ -21,6 +21,7 @@ const boardCanvas = document.getElementById("board");
 const ctx = boardCanvas.getContext("2d");
 const sgfSelect = document.getElementById("sgfSelect");
 const reloadBtn = document.getElementById("reloadBtn");
+const nextPuzzleBtn = document.getElementById("nextPuzzleBtn");
 const changeModeBtn = document.getElementById("changeModeBtn");
 const modePill = document.getElementById("modePill");
 const firstBtn = document.getElementById("firstBtn");
@@ -83,6 +84,23 @@ function coordToPoint(coord) {
 
 function pointToCoord(point) {
   return String.fromCharCode(97 + point.x) + String.fromCharCode(97 + point.y);
+}
+
+function parseProblemIndex(path) {
+  const match = /\/(\d{3})\.sgf$/i.exec(path || "");
+  if (!match) {
+    return 1;
+  }
+  const idx = Number.parseInt(match[1], 10);
+  if (!Number.isInteger(idx) || idx < 1 || idx > 100) {
+    return 1;
+  }
+  return idx;
+}
+
+function sgfPathForIndex(idx) {
+  const safe = Math.max(1, Math.min(100, idx));
+  return `${SGF_DIR}/${String(safe).padStart(3, "0")}.sgf`;
 }
 
 function parseSgf(text) {
@@ -993,6 +1011,17 @@ function backToStart() {
   state.mode = null;
 }
 
+function goNextPuzzle() {
+  const currentIdx = parseProblemIndex(sgfSelect.value);
+  const nextIdx = currentIdx >= 100 ? 1 : currentIdx + 1;
+  const nextPath = sgfPathForIndex(nextIdx);
+  sgfSelect.value = nextPath;
+  startSgfSelect.value = nextPath;
+  loadSgf(nextPath).catch((err) => {
+    statusEl.textContent = err.message;
+  });
+}
+
 function wireEvents() {
   startSgfSelect.addEventListener("change", () => {
     sgfSelect.value = startSgfSelect.value;
@@ -1011,6 +1040,7 @@ function wireEvents() {
     });
   });
 
+  nextPuzzleBtn.addEventListener("click", goNextPuzzle);
   changeModeBtn.addEventListener("click", backToStart);
 
   sgfSelect.addEventListener("change", () => {
