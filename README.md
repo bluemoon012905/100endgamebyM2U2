@@ -2,6 +2,8 @@
 
 Static web SGF reader for the 100 Go endgame problems in `9x9 Endgame Book 1`.
 
+Attribution: puzzles are provided by Reddit user **M2U2**.
+
 ## Features
 
 - GitHub Pages hostable (no build step, plain HTML/CSS/JS)
