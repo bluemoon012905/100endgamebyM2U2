@@ -21,6 +21,7 @@ const boardCanvas = document.getElementById("board");
 const ctx = boardCanvas.getContext("2d");
 const sgfSelect = document.getElementById("sgfSelect");
 const reloadBtn = document.getElementById("reloadBtn");
+const prevPuzzleBtn = document.getElementById("prevPuzzleBtn");
 const nextPuzzleBtn = document.getElementById("nextPuzzleBtn");
 const changeModeBtn = document.getElementById("changeModeBtn");
 const modePill = document.getElementById("modePill");
@@ -1079,6 +1080,17 @@ function goNextPuzzle() {
   });
 }
 
+function goPrevPuzzle() {
+  const currentIdx = parseProblemIndex(sgfSelect.value);
+  const prevIdx = currentIdx <= 1 ? 100 : currentIdx - 1;
+  const prevPath = sgfPathForIndex(prevIdx);
+  sgfSelect.value = prevPath;
+  startSgfSelect.value = prevPath;
+  loadSgf(prevPath).catch((err) => {
+    statusEl.textContent = err.message;
+  });
+}
+
 function getBoardPointFromEvent(e) {
   if (!boardCanvas._renderMeta) {
     return null;
@@ -1210,6 +1222,7 @@ function wireEvents() {
     });
   });
 
+  prevPuzzleBtn.addEventListener("click", goPrevPuzzle);
   nextPuzzleBtn.addEventListener("click", goNextPuzzle);
   changeModeBtn.addEventListener("click", backToStart);
   confirmMoveToggle.addEventListener("change", () => {
