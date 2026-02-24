@@ -37,6 +37,7 @@ const settingsToggleBtn = document.getElementById("settingsToggleBtn");
 const settingsBody = document.getElementById("settingsBody");
 const settingsRow = document.querySelector(".settings-row");
 const confirmMoveToggle = document.getElementById("confirmMoveToggle");
+const coordinatesToggle = document.getElementById("coordinatesToggle");
 const shuffleNextToggle = document.getElementById("shuffleNextToggle");
 const shuffleOrientationToggle = document.getElementById("shuffleOrientationToggle");
 const confirmPrompt = document.getElementById("confirmPrompt");
@@ -73,6 +74,7 @@ const state = {
     confirmMoves: false,
     pendingConfirm: null,
     boardRotation: 0,
+    showCoordinates: true,
   },
   navigation: {
     puzzleHistory: [],
@@ -167,6 +169,14 @@ function logicalPointFromDisplay(point, size) {
 
 function chooseBoardRotationForCurrentPuzzle() {
   state.ui.boardRotation = state.navigation.shuffleOrientation ? randomBoardRotation() : 0;
+}
+
+function coordinateColumnLabel(idx) {
+  const letters = "ABCDEFGHJKLMNOPQRSTUVWXYZ";
+  if (idx >= 0 && idx < letters.length) {
+    return letters[idx];
+  }
+  return String.fromCharCode(65 + idx);
 }
 
 function recordPuzzleVisit(path) {
@@ -563,6 +573,27 @@ function drawBoard(stateForNode) {
       ctx.beginPath();
       ctx.arc(cx, cy, Math.max(2.5, cell * 0.08), 0, Math.PI * 2);
       ctx.fill();
+    }
+  }
+
+  if (state.ui.showCoordinates) {
+    const coordOffset = Math.max(12, cell * 0.55);
+    ctx.fillStyle = "#3f2b13";
+    ctx.font = `${Math.max(11, Math.round(cell * 0.34))}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    for (let x = 0; x < size; x += 1) {
+      const cx = pad + x * cell;
+      const col = coordinateColumnLabel(x);
+      ctx.fillText(col, cx, pad - coordOffset);
+      ctx.fillText(col, cx, h - pad + coordOffset);
+    }
+    for (let y = 0; y < size; y += 1) {
+      const cy = pad + y * cell;
+      const row = String(size - y);
+      ctx.fillText(row, pad - coordOffset, cy);
+      ctx.fillText(row, w - pad + coordOffset, cy);
     }
   }
 
@@ -1340,6 +1371,12 @@ function wireEvents() {
     state.ui.confirmMoves = !!confirmMoveToggle.checked;
     clearConfirmPrompt();
   });
+  coordinatesToggle.addEventListener("change", () => {
+    state.ui.showCoordinates = !!coordinatesToggle.checked;
+    if (state.currentNode) {
+      render();
+    }
+  });
 
   shuffleNextToggle.addEventListener("change", () => {
     state.navigation.shuffleNextPuzzle = !!shuffleNextToggle.checked;
@@ -1451,5 +1488,6 @@ initSelector(startSgfSelect);
 initSelector(sgfSelect);
 startSgfSelect.value = `${SGF_DIR}/001.sgf`;
 sgfSelect.value = startSgfSelect.value;
+coordinatesToggle.checked = true;
 setSettingsExpanded(true);
 wireEvents();
