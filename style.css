@@ -110,6 +110,12 @@ body {
   color: #4b443c;
 }
 
+.start-credit {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: #4b443c;
+}
+
 .board-panel,
 .info-panel {
   background: var(--panel);
