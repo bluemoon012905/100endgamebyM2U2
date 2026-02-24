@@ -1282,11 +1282,25 @@ function wireEvents() {
 
   boardCanvas.addEventListener("mouseleave", () => {
     setHoverCandidate(null);
-    clearConfirmPrompt();
   });
 
   boardPanelEl.addEventListener("click", (e) => {
     if (!confirmPrompt.classList.contains("hidden") && !confirmPrompt.contains(e.target) && e.target !== boardCanvas) {
+      clearConfirmPrompt();
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (confirmPrompt.classList.contains("hidden")) {
+      return;
+    }
+    const target = e.target;
+    if (confirmPrompt.contains(target) || target === boardCanvas) {
+      return;
+    }
+    if (target instanceof Element && target.closest("button")) {
+      clearConfirmPrompt();
+    } else if (!boardPanelEl.contains(target)) {
       clearConfirmPrompt();
     }
   });
