@@ -33,6 +33,9 @@ const navRow = document.getElementById("navRow");
 const puzzleActions = document.getElementById("puzzleActions");
 const puzzleResetBtn = document.getElementById("puzzleResetBtn");
 const puzzleSubmitBtn = document.getElementById("puzzleSubmitBtn");
+const settingsToggleBtn = document.getElementById("settingsToggleBtn");
+const settingsBody = document.getElementById("settingsBody");
+const settingsRow = document.querySelector(".settings-row");
 const confirmMoveToggle = document.getElementById("confirmMoveToggle");
 const shuffleNextToggle = document.getElementById("shuffleNextToggle");
 const shuffleOrientationToggle = document.getElementById("shuffleOrientationToggle");
@@ -1303,6 +1306,12 @@ function showConfirmPromptAt(point, color) {
   render();
 }
 
+function setSettingsExpanded(expanded) {
+  settingsBody.classList.toggle("hidden", !expanded);
+  settingsRow.classList.toggle("compact", !expanded);
+  settingsToggleBtn.setAttribute("aria-expanded", expanded ? "true" : "false");
+}
+
 function wireEvents() {
   startSgfSelect.addEventListener("change", () => {
     sgfSelect.value = startSgfSelect.value;
@@ -1313,6 +1322,11 @@ function wireEvents() {
       const mode = btn.dataset.mode;
       startMode(mode);
     });
+  });
+
+  settingsToggleBtn.addEventListener("click", () => {
+    const expanded = settingsToggleBtn.getAttribute("aria-expanded") === "true";
+    setSettingsExpanded(!expanded);
   });
 
   reloadBtn.addEventListener("click", () => {
@@ -1437,4 +1451,5 @@ initSelector(startSgfSelect);
 initSelector(sgfSelect);
 startSgfSelect.value = `${SGF_DIR}/001.sgf`;
 sgfSelect.value = startSgfSelect.value;
+setSettingsExpanded(true);
 wireEvents();

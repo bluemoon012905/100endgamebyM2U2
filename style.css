@@ -187,13 +187,20 @@ body {
   padding: 8px;
 }
 
-.settings-title {
-  font-size: 12px;
+.settings-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-toggle {
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #5f513f;
-  margin-right: 2px;
+}
+
+.settings-row.compact {
+  padding: 6px 8px;
+  margin-bottom: 8px;
 }
 
 .toolbar button:hover,
