@@ -34,6 +34,8 @@ const puzzleActions = document.getElementById("puzzleActions");
 const puzzleResetBtn = document.getElementById("puzzleResetBtn");
 const puzzleSubmitBtn = document.getElementById("puzzleSubmitBtn");
 const confirmMoveToggle = document.getElementById("confirmMoveToggle");
+const shuffleNextToggle = document.getElementById("shuffleNextToggle");
+const shuffleOrientationToggle = document.getElementById("shuffleOrientationToggle");
 const confirmPrompt = document.getElementById("confirmPrompt");
 const confirmMoveBtn = document.getElementById("confirmMoveBtn");
 const cancelMoveBtn = document.getElementById("cancelMoveBtn");
@@ -67,6 +69,13 @@ const state = {
     hover: null,
     confirmMoves: false,
     pendingConfirm: null,
+    boardRotation: 0,
+  },
+  navigation: {
+    puzzleHistory: [],
+    puzzleHistoryIndex: -1,
+    shuffleNextPuzzle: false,
+    shuffleOrientation: false,
   },
 };
 
@@ -112,6 +121,62 @@ function parseProblemIndex(path) {
 function sgfPathForIndex(idx) {
   const safe = Math.max(1, Math.min(100, idx));
   return `${SGF_DIR}/${String(safe).padStart(3, "0")}.sgf`;
+}
+
+function randomBoardRotation() {
+  const all = [0, 90, 180, 270];
+  return all[Math.floor(Math.random() * all.length)];
+}
+
+function displayPointFromLogical(point, size) {
+  if (!point) {
+    return null;
+  }
+  const rot = state.ui.boardRotation;
+  if (rot === 90) {
+    return { x: size - 1 - point.y, y: point.x };
+  }
+  if (rot === 180) {
+    return { x: size - 1 - point.x, y: size - 1 - point.y };
+  }
+  if (rot === 270) {
+    return { x: point.y, y: size - 1 - point.x };
+  }
+  return { x: point.x, y: point.y };
+}
+
+function logicalPointFromDisplay(point, size) {
+  if (!point) {
+    return null;
+  }
+  const rot = state.ui.boardRotation;
+  if (rot === 90) {
+    return { x: point.y, y: size - 1 - point.x };
+  }
+  if (rot === 180) {
+    return { x: size - 1 - point.x, y: size - 1 - point.y };
+  }
+  if (rot === 270) {
+    return { x: size - 1 - point.y, y: point.x };
+  }
+  return { x: point.x, y: point.y };
+}
+
+function chooseBoardRotationForCurrentPuzzle() {
+  state.ui.boardRotation = state.navigation.shuffleOrientation ? randomBoardRotation() : 0;
+}
+
+function recordPuzzleVisit(path) {
+  const history = state.navigation.puzzleHistory;
+  const idx = state.navigation.puzzleHistoryIndex;
+  if (idx >= 0 && history[idx] === path) {
+    return;
+  }
+  if (idx < history.length - 1) {
+    history.splice(idx + 1);
+  }
+  history.push(path);
+  state.navigation.puzzleHistoryIndex = history.length - 1;
 }
 
 function parseSgf(text) {
@@ -503,8 +568,9 @@ function drawBoard(stateForNode) {
     for (let x = 0; x < size; x += 1) {
       const val = stateForNode.board[y][x];
       if (!val) continue;
-      const cx = pad + x * cell;
-      const cy = pad + y * cell;
+      const display = displayPointFromLogical({ x, y }, size);
+      const cx = pad + display.x * cell;
+      const cy = pad + display.y * cell;
 
       const stoneGrad = ctx.createRadialGradient(
         cx - stoneR * 0.35,
@@ -543,8 +609,9 @@ function drawBoard(stateForNode) {
       hp.y < size &&
       stateForNode.board[hp.y][hp.x] === null
     ) {
-      const cx = pad + hp.x * cell;
-      const cy = pad + hp.y * cell;
+      const display = displayPointFromLogical(hp, size);
+      const cx = pad + display.x * cell;
+      const cy = pad + display.y * cell;
       ctx.globalAlpha = 0.55;
       const hoverGrad = ctx.createRadialGradient(
         cx - stoneR * 0.35,
@@ -575,8 +642,9 @@ function drawBoard(stateForNode) {
   }
 
   if (stateForNode.lastMove) {
-    const cx = pad + stateForNode.lastMove.x * cell;
-    const cy = pad + stateForNode.lastMove.y * cell;
+    const display = displayPointFromLogical(stateForNode.lastMove, size);
+    const cx = pad + display.x * cell;
+    const cy = pad + display.y * cell;
     const color = stateForNode.board[stateForNode.lastMove.y][stateForNode.lastMove.x] === "B" ? "#fff" : "#111";
     ctx.beginPath();
     ctx.strokeStyle = color;
@@ -590,8 +658,9 @@ function drawBoard(stateForNode) {
   ctx.textBaseline = "middle";
   for (const l of stateForNode.labels || []) {
     if (l.x >= size || l.y >= size) continue;
-    const cx = pad + l.x * cell;
-    const cy = pad + l.y * cell;
+    const display = displayPointFromLogical(l, size);
+    const cx = pad + display.x * cell;
+    const cy = pad + display.y * cell;
     const under = stateForNode.board[l.y][l.x];
     ctx.fillStyle = under === "B" ? "#fff" : "#111";
     ctx.fillText(l.text, cx, cy);
@@ -599,8 +668,9 @@ function drawBoard(stateForNode) {
 
   for (const m of stateForNode.marks || []) {
     if (m.x >= size || m.y >= size) continue;
-    const cx = pad + m.x * cell;
-    const cy = pad + m.y * cell;
+    const display = displayPointFromLogical(m, size);
+    const cx = pad + display.x * cell;
+    const cy = pad + display.y * cell;
     const under = stateForNode.board[m.y][m.x];
     ctx.strokeStyle = under === "B" ? "#fff" : "#111";
     ctx.lineWidth = 2;
@@ -1023,6 +1093,7 @@ async function loadSgf(path) {
   state.selectedChildByNodeId.clear();
   state.puzzle.userMoves = [];
   state.ui.hover = null;
+  chooseBoardRotationForCurrentPuzzle();
   clearConfirmPrompt();
 
   const gameTree = parseSgf(text);
@@ -1047,6 +1118,20 @@ async function loadSgf(path) {
   }
 }
 
+function openPuzzle(path, { recordHistory = true } = {}) {
+  sgfSelect.value = path;
+  startSgfSelect.value = path;
+  return loadSgf(path)
+    .then(() => {
+      if (recordHistory) {
+        recordPuzzleVisit(path);
+      }
+    })
+    .catch((err) => {
+      statusEl.textContent = err.message;
+    });
+}
+
 function startMode(mode) {
   state.mode = mode;
   sgfSelect.value = startSgfSelect.value;
@@ -1055,9 +1140,7 @@ function startMode(mode) {
   viewerEl.classList.remove("hidden");
   applyModeUi();
 
-  loadSgf(sgfSelect.value).catch((err) => {
-    statusEl.textContent = err.message;
-  });
+  openPuzzle(sgfSelect.value);
 }
 
 function backToStart() {
@@ -1070,25 +1153,40 @@ function backToStart() {
 }
 
 function goNextPuzzle() {
-  const currentIdx = parseProblemIndex(sgfSelect.value);
-  const nextIdx = currentIdx >= 100 ? 1 : currentIdx + 1;
-  const nextPath = sgfPathForIndex(nextIdx);
-  sgfSelect.value = nextPath;
-  startSgfSelect.value = nextPath;
-  loadSgf(nextPath).catch((err) => {
-    statusEl.textContent = err.message;
-  });
+  let nextPath = null;
+
+  if (state.navigation.shuffleNextPuzzle) {
+    const currentPath = sgfSelect.value;
+    let guard = 200;
+    while (guard > 0) {
+      guard -= 1;
+      const randomIdx = Math.floor(Math.random() * 100) + 1;
+      const candidate = sgfPathForIndex(randomIdx);
+      if (candidate !== currentPath || state.navigation.puzzleHistory.length <= 1) {
+        nextPath = candidate;
+        break;
+      }
+    }
+    if (!nextPath) {
+      nextPath = currentPath;
+    }
+  } else {
+    const currentIdx = parseProblemIndex(sgfSelect.value);
+    const nextIdx = currentIdx >= 100 ? 1 : currentIdx + 1;
+    nextPath = sgfPathForIndex(nextIdx);
+  }
+
+  openPuzzle(nextPath);
 }
 
 function goPrevPuzzle() {
-  const currentIdx = parseProblemIndex(sgfSelect.value);
-  const prevIdx = currentIdx <= 1 ? 100 : currentIdx - 1;
-  const prevPath = sgfPathForIndex(prevIdx);
-  sgfSelect.value = prevPath;
-  startSgfSelect.value = prevPath;
-  loadSgf(prevPath).catch((err) => {
-    statusEl.textContent = err.message;
-  });
+  if (state.navigation.puzzleHistoryIndex <= 0) {
+    statusEl.textContent = "No earlier puzzle in history.";
+    return;
+  }
+  state.navigation.puzzleHistoryIndex -= 1;
+  const prevPath = state.navigation.puzzleHistory[state.navigation.puzzleHistoryIndex];
+  openPuzzle(prevPath, { recordHistory: false });
 }
 
 function getBoardPointFromEvent(e) {
@@ -1105,7 +1203,7 @@ function getBoardPointFromEvent(e) {
   if (gx < 0 || gy < 0 || gx >= size || gy >= size) {
     return null;
   }
-  return { x: gx, y: gy };
+  return logicalPointFromDisplay({ x: gx, y: gy }, size);
 }
 
 function samePoint(a, b) {
@@ -1189,10 +1287,11 @@ function showConfirmPromptAt(point, color) {
   if (!boardCanvas._renderMeta) {
     return;
   }
-  const { pad, cell } = boardCanvas._renderMeta;
+  const { pad, cell, size } = boardCanvas._renderMeta;
+  const displayPoint = displayPointFromLogical(point, size);
   const rect = boardCanvas.getBoundingClientRect();
-  const cxCanvas = pad + point.x * cell;
-  const cyCanvas = pad + point.y * cell;
+  const cxCanvas = pad + displayPoint.x * cell;
+  const cyCanvas = pad + displayPoint.y * cell;
   const cx = boardCanvas.offsetLeft + (cxCanvas / boardCanvas.width) * rect.width;
   const cy = boardCanvas.offsetTop + (cyCanvas / boardCanvas.height) * rect.height;
 
@@ -1217,9 +1316,7 @@ function wireEvents() {
   });
 
   reloadBtn.addEventListener("click", () => {
-    loadSgf(sgfSelect.value).catch((err) => {
-      statusEl.textContent = err.message;
-    });
+    openPuzzle(sgfSelect.value);
   });
 
   prevPuzzleBtn.addEventListener("click", goPrevPuzzle);
@@ -1230,11 +1327,19 @@ function wireEvents() {
     clearConfirmPrompt();
   });
 
+  shuffleNextToggle.addEventListener("change", () => {
+    state.navigation.shuffleNextPuzzle = !!shuffleNextToggle.checked;
+  });
+  shuffleOrientationToggle.addEventListener("change", () => {
+    state.navigation.shuffleOrientation = !!shuffleOrientationToggle.checked;
+    chooseBoardRotationForCurrentPuzzle();
+    if (state.currentNode) {
+      render();
+    }
+  });
+
   sgfSelect.addEventListener("change", () => {
-    startSgfSelect.value = sgfSelect.value;
-    loadSgf(sgfSelect.value).catch((err) => {
-      statusEl.textContent = err.message;
-    });
+    openPuzzle(sgfSelect.value);
   });
 
   firstBtn.addEventListener("click", goFirst);

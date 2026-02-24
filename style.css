@@ -130,7 +130,7 @@ body {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .mode-pill {
@@ -172,6 +172,27 @@ body {
 
 .confirm-toggle input {
   margin: 0;
+}
+
+.settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  border: 1px solid #d8c7a5;
+  border-radius: 10px;
+  background: #fffdf7;
+  padding: 8px;
+}
+
+.settings-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5f513f;
+  margin-right: 2px;
 }
 
 .toolbar button:hover,

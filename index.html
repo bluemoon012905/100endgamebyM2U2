@@ -42,11 +42,22 @@
         <button id="reloadBtn" type="button">Reload</button>
         <button id="prevPuzzleBtn" type="button">Previous Puzzle</button>
         <button id="nextPuzzleBtn" type="button">Next Puzzle</button>
+        <button id="changeModeBtn" type="button">Change Mode</button>
+      </div>
+      <div class="settings-row">
+        <span class="settings-title">Settings</span>
         <label class="confirm-toggle">
           <input id="confirmMoveToggle" type="checkbox">
           Confirm moves
         </label>
-        <button id="changeModeBtn" type="button">Change Mode</button>
+        <label class="confirm-toggle">
+          <input id="shuffleNextToggle" type="checkbox">
+          Shuffle next puzzle
+        </label>
+        <label class="confirm-toggle">
+          <input id="shuffleOrientationToggle" type="checkbox">
+          Shuffle orientation
+        </label>
       </div>
       <canvas id="board" width="540" height="540" aria-label="Go board"></canvas>
       <div id="navRow" class="nav-row">
