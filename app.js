@@ -1137,6 +1137,10 @@ function getHoverCandidate(point) {
 function clearConfirmPrompt() {
   state.ui.pendingConfirm = null;
   confirmPrompt.classList.add("hidden");
+  if (state.ui.confirmMoves) {
+    state.ui.hover = null;
+    render();
+  }
 }
 
 function setHoverCandidate(candidate) {
@@ -1181,9 +1185,11 @@ function showConfirmPromptAt(point, color) {
   const cy = boardCanvas.offsetTop + (cyCanvas / boardCanvas.height) * rect.height;
 
   state.ui.pendingConfirm = { point, color };
+  state.ui.hover = { point, color };
   confirmPrompt.style.left = `${cx}px`;
   confirmPrompt.style.top = `${cy}px`;
   confirmPrompt.classList.remove("hidden");
+  render();
 }
 
 function wireEvents() {
@@ -1281,6 +1287,9 @@ function wireEvents() {
   });
 
   boardCanvas.addEventListener("mouseleave", () => {
+    if (state.ui.pendingConfirm) {
+      return;
+    }
     setHoverCandidate(null);
   });
 
