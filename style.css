@@ -144,6 +144,7 @@ body {
 
 .toolbar select,
 .toolbar button,
+.settings-row button,
 .nav-row button {
   border-radius: 8px;
   border: 1px solid #a79370;
@@ -196,6 +197,7 @@ body {
 }
 
 .toolbar button:hover,
+.settings-row button:hover,
 .nav-row button:hover,
 .variation-btn:hover {
   background: #f2ebdd;
