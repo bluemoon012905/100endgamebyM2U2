@@ -32,6 +32,10 @@ const navRow = document.getElementById("navRow");
 const puzzleActions = document.getElementById("puzzleActions");
 const puzzleResetBtn = document.getElementById("puzzleResetBtn");
 const puzzleSubmitBtn = document.getElementById("puzzleSubmitBtn");
+const confirmMoveToggle = document.getElementById("confirmMoveToggle");
+const confirmPrompt = document.getElementById("confirmPrompt");
+const confirmMoveBtn = document.getElementById("confirmMoveBtn");
+const cancelMoveBtn = document.getElementById("cancelMoveBtn");
 const hintTextEl = document.getElementById("hintText");
 const feedbackOverlayEl = document.getElementById("feedbackOverlay");
 const statusEl = document.getElementById("status");
@@ -39,6 +43,7 @@ const capturesEl = document.getElementById("captures");
 const notesEl = document.getElementById("notes");
 const variationBlockEl = document.getElementById("variationBlock");
 const variationsEl = document.getElementById("variations");
+const boardPanelEl = document.querySelector(".board-panel");
 
 const state = {
   mode: null,
@@ -56,6 +61,11 @@ const state = {
     answerComment: "",
     baseBoardState: null,
     userMoves: [],
+  },
+  ui: {
+    hover: null,
+    confirmMoves: false,
+    pendingConfirm: null,
   },
 };
 
@@ -522,6 +532,47 @@ function drawBoard(stateForNode) {
     }
   }
 
+  if (state.ui.hover && state.ui.hover.color) {
+    const hp = state.ui.hover.point;
+    if (
+      hp &&
+      hp.x >= 0 &&
+      hp.y >= 0 &&
+      hp.x < size &&
+      hp.y < size &&
+      stateForNode.board[hp.y][hp.x] === null
+    ) {
+      const cx = pad + hp.x * cell;
+      const cy = pad + hp.y * cell;
+      ctx.globalAlpha = 0.55;
+      const hoverGrad = ctx.createRadialGradient(
+        cx - stoneR * 0.35,
+        cy - stoneR * 0.35,
+        stoneR * 0.15,
+        cx,
+        cy,
+        stoneR
+      );
+      if (state.ui.hover.color === "B") {
+        hoverGrad.addColorStop(0, "#777");
+        hoverGrad.addColorStop(1, "#1a1a1a");
+      } else {
+        hoverGrad.addColorStop(0, "#ffffff");
+        hoverGrad.addColorStop(1, "#d8d8d8");
+      }
+      ctx.beginPath();
+      ctx.arc(cx, cy, stoneR, 0, Math.PI * 2);
+      ctx.fillStyle = hoverGrad;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = state.ui.hover.color === "B" ? "#111" : "#888";
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
   if (stateForNode.lastMove) {
     const cx = pad + stateForNode.lastMove.x * cell;
     const cy = pad + stateForNode.lastMove.y * cell;
@@ -874,7 +925,7 @@ function applyResponsiveClick(point) {
 
   if (move.point.x !== point.x || move.point.y !== point.y) {
     showFeedback("Wrong!", true);
-    return;
+    return true;
   }
 
   state.puzzle.answerIndex += 1;
@@ -885,6 +936,7 @@ function applyResponsiveClick(point) {
   }
 
   render();
+  return true;
 }
 
 function answerKeyNextColor() {
@@ -899,7 +951,7 @@ function answerKeyNextColor() {
 function applyAnswerKeyClick(point) {
   const boardState = rebuildAnswerAttemptBoard();
   if (boardState.board[point.y][point.x] !== null) {
-    return;
+    return false;
   }
 
   const color = answerKeyNextColor();
@@ -909,6 +961,7 @@ function applyAnswerKeyClick(point) {
     coord: pointToCoord(point),
   });
   render();
+  return true;
 }
 
 function submitAnswerKey() {
@@ -968,6 +1021,8 @@ async function loadSgf(path) {
   state.nextNodeId = 1;
   state.selectedChildByNodeId.clear();
   state.puzzle.userMoves = [];
+  state.ui.hover = null;
+  clearConfirmPrompt();
 
   const gameTree = parseSgf(text);
   state.virtualRoot = buildNodeTree(gameTree);
@@ -1008,6 +1063,8 @@ function backToStart() {
   viewerEl.classList.add("hidden");
   startScreenEl.classList.remove("hidden");
   feedbackOverlayEl.classList.add("hidden");
+  state.ui.hover = null;
+  clearConfirmPrompt();
   state.mode = null;
 }
 
@@ -1020,6 +1077,113 @@ function goNextPuzzle() {
   loadSgf(nextPath).catch((err) => {
     statusEl.textContent = err.message;
   });
+}
+
+function getBoardPointFromEvent(e) {
+  if (!boardCanvas._renderMeta) {
+    return null;
+  }
+  const rect = boardCanvas.getBoundingClientRect();
+  const x = ((e.clientX - rect.left) / rect.width) * boardCanvas.width;
+  const y = ((e.clientY - rect.top) / rect.height) * boardCanvas.height;
+
+  const { pad, cell, size } = boardCanvas._renderMeta;
+  const gx = Math.round((x - pad) / cell);
+  const gy = Math.round((y - pad) / cell);
+  if (gx < 0 || gy < 0 || gx >= size || gy >= size) {
+    return null;
+  }
+  return { x: gx, y: gy };
+}
+
+function samePoint(a, b) {
+  return !!a && !!b && a.x === b.x && a.y === b.y;
+}
+
+function getHoverCandidate(point) {
+  if (!point || !state.mode) {
+    return null;
+  }
+
+  if (state.mode === MODES.EXPLORATION) {
+    const children = state.currentNode?.children || [];
+    for (const child of children) {
+      const move = getNodeMove(child);
+      if (!move || !move.point) continue;
+      if (move.point.x === point.x && move.point.y === point.y) {
+        return { point, color: move.color };
+      }
+    }
+    return null;
+  }
+
+  if (state.mode === MODES.RESPONSIVE) {
+    const next = state.puzzle.answerPath[state.puzzle.answerIndex + 1];
+    if (!next) return null;
+    const bState = boardStateForNode(state.currentNode);
+    if (bState.board[point.y][point.x] !== null) return null;
+    return { point, color: state.puzzle.playerColor };
+  }
+
+  if (state.mode === MODES.ANSWER_KEY) {
+    const bState = rebuildAnswerAttemptBoard();
+    if (bState.board[point.y][point.x] !== null) return null;
+    return { point, color: answerKeyNextColor() };
+  }
+
+  return null;
+}
+
+function clearConfirmPrompt() {
+  state.ui.pendingConfirm = null;
+  confirmPrompt.classList.add("hidden");
+}
+
+function setHoverCandidate(candidate) {
+  const prev = state.ui.hover;
+  const unchanged =
+    (prev === null && candidate === null) ||
+    (prev &&
+      candidate &&
+      prev.color === candidate.color &&
+      samePoint(prev.point, candidate.point));
+  if (unchanged) {
+    return;
+  }
+  state.ui.hover = candidate;
+  render();
+}
+
+function executeBoardAction(point) {
+  clearConfirmPrompt();
+  if (state.mode === MODES.EXPLORATION) {
+    goToChildByMove(point);
+    return;
+  }
+  if (state.mode === MODES.RESPONSIVE) {
+    applyResponsiveClick(point);
+    return;
+  }
+  if (state.mode === MODES.ANSWER_KEY) {
+    applyAnswerKeyClick(point);
+  }
+}
+
+function showConfirmPromptAt(point, color) {
+  if (!boardCanvas._renderMeta) {
+    return;
+  }
+  const { pad, cell } = boardCanvas._renderMeta;
+  const rect = boardCanvas.getBoundingClientRect();
+  const cxCanvas = pad + point.x * cell;
+  const cyCanvas = pad + point.y * cell;
+  const cx = boardCanvas.offsetLeft + (cxCanvas / boardCanvas.width) * rect.width;
+  const cy = boardCanvas.offsetTop + (cyCanvas / boardCanvas.height) * rect.height;
+
+  state.ui.pendingConfirm = { point, color };
+  confirmPrompt.style.left = `${cx}px`;
+  confirmPrompt.style.top = `${cy}px`;
+  confirmPrompt.classList.remove("hidden");
 }
 
 function wireEvents() {
@@ -1042,6 +1206,10 @@ function wireEvents() {
 
   nextPuzzleBtn.addEventListener("click", goNextPuzzle);
   changeModeBtn.addEventListener("click", backToStart);
+  confirmMoveToggle.addEventListener("change", () => {
+    state.ui.confirmMoves = !!confirmMoveToggle.checked;
+    clearConfirmPrompt();
+  });
 
   sgfSelect.addEventListener("change", () => {
     startSgfSelect.value = sgfSelect.value;
@@ -1057,6 +1225,12 @@ function wireEvents() {
 
   puzzleSubmitBtn.addEventListener("click", submitAnswerKey);
   puzzleResetBtn.addEventListener("click", resetAnswerKeyAttempt);
+  confirmMoveBtn.addEventListener("click", () => {
+    const pending = state.ui.pendingConfirm;
+    if (!pending) return;
+    executeBoardAction(pending.point);
+  });
+  cancelMoveBtn.addEventListener("click", clearConfirmPrompt);
 
   window.addEventListener("keydown", (e) => {
     if (state.mode !== MODES.EXPLORATION) {
@@ -1082,26 +1256,38 @@ function wireEvents() {
     if (!boardCanvas._renderMeta || !state.mode) {
       return;
     }
-    const rect = boardCanvas.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * boardCanvas.width;
-    const y = ((e.clientY - rect.top) / rect.height) * boardCanvas.height;
-
-    const { pad, cell, size } = boardCanvas._renderMeta;
-    const gx = Math.round((x - pad) / cell);
-    const gy = Math.round((y - pad) / cell);
-
-    if (gx < 0 || gy < 0 || gx >= size || gy >= size) {
+    const point = getBoardPointFromEvent(e);
+    if (!point) {
       return;
     }
 
-    const point = { x: gx, y: gy };
+    const candidate = getHoverCandidate(point);
+    if (!candidate) {
+      return;
+    }
 
-    if (state.mode === MODES.EXPLORATION) {
-      goToChildByMove(point);
-    } else if (state.mode === MODES.RESPONSIVE) {
-      applyResponsiveClick(point);
-    } else if (state.mode === MODES.ANSWER_KEY) {
-      applyAnswerKeyClick(point);
+    if (state.ui.confirmMoves) {
+      showConfirmPromptAt(point, candidate.color);
+      return;
+    }
+
+    executeBoardAction(point);
+  });
+
+  boardCanvas.addEventListener("mousemove", (e) => {
+    const point = getBoardPointFromEvent(e);
+    const candidate = getHoverCandidate(point);
+    setHoverCandidate(candidate);
+  });
+
+  boardCanvas.addEventListener("mouseleave", () => {
+    setHoverCandidate(null);
+    clearConfirmPrompt();
+  });
+
+  boardPanelEl.addEventListener("click", (e) => {
+    if (!confirmPrompt.classList.contains("hidden") && !confirmPrompt.contains(e.target) && e.target !== boardCanvas) {
+      clearConfirmPrompt();
     }
   });
 }

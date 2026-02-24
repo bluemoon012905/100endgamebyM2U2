@@ -40,6 +40,10 @@
         <select id="sgfSelect" aria-label="Choose SGF file"></select>
         <button id="reloadBtn" type="button">Reload</button>
         <button id="nextPuzzleBtn" type="button">Next Puzzle</button>
+        <label class="confirm-toggle">
+          <input id="confirmMoveToggle" type="checkbox">
+          Confirm moves
+        </label>
         <button id="changeModeBtn" type="button">Change Mode</button>
       </div>
       <canvas id="board" width="540" height="540" aria-label="Go board"></canvas>
@@ -55,6 +59,13 @@
       </div>
       <div id="hintText" class="hint">Click a board point to follow that move when a branch exists.</div>
       <div id="feedbackOverlay" class="feedback-overlay hidden" aria-live="assertive"></div>
+      <div id="confirmPrompt" class="confirm-prompt hidden">
+        <div class="confirm-copy">Confirm move?</div>
+        <div class="confirm-actions">
+          <button id="confirmMoveBtn" type="button">Confirm</button>
+          <button id="cancelMoveBtn" type="button">Cancel</button>
+        </div>
+      </div>
     </section>
 
     <aside class="info-panel">
